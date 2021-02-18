@@ -1,0 +1,22 @@
+#!/bin/bash
+#SBATCH --time=24:00:00
+#SBATCH --mem=10G
+
+module load ncbi_blast
+
+DB=$1
+DIR=$2
+
+pushd $DIR
+for fa in *.fa;
+do
+  NAME=${fa%.*}
+  OUT=${NAME}.blast.csv
+  if [[ $fa -nt $OUT ]];
+  then
+    blastn -db $DB -query $fa -outfmt 6 > $OUT
+  fi
+done
+
+# We need to go back to the original dir for .done to work
+popd

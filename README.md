@@ -1,2 +1,6 @@
 # flaco
-Code for Florida Covid Sequencing project
+Florida COVID sequencing project
+
+See documentation for:
+
+[flaco_blast](doc/flaco_blast_doc.md)
