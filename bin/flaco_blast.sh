@@ -1,34 +1,38 @@
 #!/bin/bash
 
 SCRIPT_HOME=$(dirname $(readlink -f $0))
+shopt -s nullglob
+
+# Number of sequences in each BLAST job
+MAX_BLAST=10
 
 source ${HPC_DIBIGTOOLS_DIR}/lib/sh/utils.sh
 
 CMD=$1
 
-if [[ "$CMD" == "makedbOLD" ]];
-then
-  FASTA=$2
-  DBDIR=$3
-  shift 3
-  REMOVE=$*
+# if [[ "$CMD" == "makedbOLD" ]];
+# then
+#   FASTA=$2
+#   DBDIR=$3
+#   shift 3
+#   REMOVE=$*
 
-  mkdir -p $DBDIR
-  FNAME=$(basename $FASTA)
-  NEWFASTA=${DBDIR}/${FNAME%.*}.sub.fa
-  echo "Cleaning alignment $FASTA"
-  if [[ "$REMOVE" != "" ]]; then
-    echo "Removing sequences containing \"$REMOVE\""
-  fi
-  ${SCRIPT_HOME}/flacotools.py clean $FASTA $REMOVE > $NEWFASTA
-  echo "Clean alignment written to $NEWFASTA "
-  echo "Generating BLAST database"
-  submit -done makedb.@.done ${SCRIPT_HOME}/makedb.qsub $NEWFASTA
-  wait_for makedb 1
-  echo "BLAST database generated."
-  echo $NEWFASTA
-  exit 0
-fi
+#   mkdir -p $DBDIR
+#   FNAME=$(basename $FASTA)
+#   NEWFASTA=${DBDIR}/${FNAME%.*}.sub.fa
+#   echo "Cleaning alignment $FASTA"
+#   if [[ "$REMOVE" != "" ]]; then
+#     echo "Removing sequences containing \"$REMOVE\""
+#   fi
+#   ${SCRIPT_HOME}/flacotools.py clean $FASTA $REMOVE > $NEWFASTA
+#   echo "Clean alignment written to $NEWFASTA "
+#   echo "Generating BLAST database"
+#   submit -done makedb.@.done ${SCRIPT_HOME}/makedb.qsub $NEWFASTA
+#   wait_for makedb 1
+#   echo "BLAST database generated."
+#   echo $NEWFASTA
+#   exit 0
+# fi
 
 if [[ "$CMD" == "makedb" ]];
 then
@@ -73,8 +77,12 @@ then
   rm -f blast.*.done
   for spdir in split-by-month/2*/;
   do
-    submit -done blast.@.done ${SCRIPT_HOME}/blast.qsub $INDEX $spdir
-    nj=$((nj+1))
+      blastcmd=$spdir/blast.cmd
+      find $spdir -name \*.fa | xargs -n $MAX_BLAST echo submit -done blast.@.done -o --account=salemi,--qos=salemi-b ${SCRIPT_HOME}/blast.qsub $spdir/${INDEX} > $blastcmd
+      nfastas=$(grep -c ^ $blastcmd)
+      source $blastcmd
+      # submit -done blast.@.done ${SCRIPT_HOME}/blast.qsub $INDEX $spdir
+      nj=$((nj+nfastas))
   done
   wait_for blast $nj
   exit 0

@@ -12,6 +12,7 @@ from Bio import SeqIO
 def main_clean(fastafile, words):
     nin = 0
     nout = 0
+    maxN = 0.3
 
     for seq in SeqIO.parse(fastafile, "fasta"):
         nin += 1
@@ -22,12 +23,11 @@ def main_clean(fastafile, words):
                 skip = True
         if skip:
             continue
-        sys.stdout.write(">" + header + "\n")
-        sys.stdout.write(str(seq.seq).replace("-", ""))
-        sys.stdout.write("\n")
-        nout += 1
+        newseq = str(seq.seq).replace("-", "").upper()
+        if 1.0*newseq.count("N") / len(newseq) <= maxN:
+            sys.stdout.write(">" + header + "\n" + newseq + "\n")
+            nout += 1
     sys.stderr.write("{} sequences in input files, {} after filtering.\n".format(nin, nout))
-
 
 # Split
 def parse_header(line):
