@@ -75,13 +75,15 @@ of the two files written by the *parse* command (main output table and matches t
 Usage:
 
 ```
-flaco_blast.sh split target.fa
+flaco_blast.sh split target.fa [moretargets.fa...]
 ```
 
-This command extracts all sequences from the FASTA file to be analyzed and saves them to subdirectories of the form `split-by-month/month`, where *month* is
-extracted from the third field of the sequence header. Each sequence is saved to a separate file called *seqid*.fa, where *seqid* is the second field of 
-the sequence header. Currently, the `split-by-month` directory name is hardcoded and cannot be changed; please rename this directory before launching 
-another execution of *split* to avoid overwriting results from a previous run.
+This command extracts all sequences from the FASTA files to be analyzed and saves them to subdirectories of the form `split-by-month/month`, 
+where *month* is extracted from the third field of the sequence header. Each sequence is saved to a separate file called *seqid*.fa, 
+where *seqid* is the second field of the sequence header. 
+
+Currently, the `split-by-month` directory name is hardcoded and cannot be changed; 
+please rename this directory before launching another execution of *split* to avoid overwriting results from a previous run.
 
 ### blast
 
