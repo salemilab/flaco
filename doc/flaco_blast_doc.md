@@ -30,8 +30,8 @@ the BLAST database) followed by the *run* command (which runs the other four com
 are in *target.fa* and the GISAID database is in *gisaid.fa*, the following two commands will run the whole pipeline:
 
 ```bash
-$ flaco_blast.sh makedb gisaid.fa gisaid-db
-$ flaco_blast.sh run target.fa gisaid-db/gisaid.sub.fa
+$ flaco_blast.sh makedb gisaid.fa [pattern]
+$ flaco_blast.sh run target.fa gisaid.clean.fa
 ```
 
 Note that the *makedb* command only needs to be executed when the GISAID database changes. The *run* command can be called as many times as needed
