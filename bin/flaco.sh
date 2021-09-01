@@ -5,7 +5,7 @@
 
 # Configuration
 BASESPACE=/home/ariva/basespace.icbr/
-CLEAN_NFRAC=95
+CLEAN_NFRAC=30
 CLEAN_MLEN=0
 
 # Script variables

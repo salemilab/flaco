@@ -1,38 +1,16 @@
 #!/bin/bash
 
+module purge
+module load python/3.8 nextflow
+
 SCRIPT_HOME=$(dirname $(readlink -f $0))
 shopt -s nullglob
+set -e
 
 # Number of sequences in each BLAST job
-MAX_BLAST=10
-
-source ${HPC_DIBIGTOOLS_DIR}/lib/sh/utils.sh
+MAX_BLAST=25
 
 CMD=$1
-
-# if [[ "$CMD" == "makedbOLD" ]];
-# then
-#   FASTA=$2
-#   DBDIR=$3
-#   shift 3
-#   REMOVE=$*
-
-#   mkdir -p $DBDIR
-#   FNAME=$(basename $FASTA)
-#   NEWFASTA=${DBDIR}/${FNAME%.*}.sub.fa
-#   echo "Cleaning alignment $FASTA"
-#   if [[ "$REMOVE" != "" ]]; then
-#     echo "Removing sequences containing \"$REMOVE\""
-#   fi
-#   ${SCRIPT_HOME}/flacotools.py clean $FASTA $REMOVE > $NEWFASTA
-#   echo "Clean alignment written to $NEWFASTA "
-#   echo "Generating BLAST database"
-#   submit -done makedb.@.done ${SCRIPT_HOME}/makedb.qsub $NEWFASTA
-#   wait_for makedb 1
-#   echo "BLAST database generated."
-#   echo $NEWFASTA
-#   exit 0
-# fi
 
 if [[ "$CMD" == "makedb" ]];
 then
@@ -43,48 +21,44 @@ then
   mkdir -p split-by-month
   FNAME=$(basename $FASTA)
   CLEAN=${FNAME%.*}.clean.fa
-  EXCLUDED=${FNAME%.*}.excl.fa
+  EXCLUDED=${FNAME%.*}.target.fa
   echo "Cleaning alignment $FASTA"
   if [[ "$REMOVE" != "" ]]; then
     echo "Removing sequences containing \"$REMOVE\""
   fi
   ${SCRIPT_HOME}/flacotools.py splitdb $FASTA $CLEAN split-by-month $EXCLUDED $REMOVE
 
-  nbl=0
   echo "Generating BLAST database"
-  for db in $(find split-by-month -name DB); do
-      submit -done makedb.@.done ${SCRIPT_HOME}/makedb.qsub $db
-      nbl=$((nbl+1))
-  done
-  wait_for makedb $nbl
+  find split-by-month -name DB > split-by-month/DBLIST
+  nextflow run ${SCRIPT_HOME}/flacoblast.nf --cmd makedb --dbfile split-by-month/DBLIST
+  nextflow clean
   exit 0
 fi
 
 if [[ "$CMD" == "split" ]];
 then
-  FASTA=$2
-  mkdir -p split-by-month
-  echo "Splitting file $FASTA by month..."
-  ${SCRIPT_HOME}/flacotools.py split $FASTA split-by-month
-  exit 0
+    shift
+    mkdir -p split-by-month
+    find split-by-month -name \*.fa | xargs rm -f
+    for FASTA in $*;
+    do
+	echo "Splitting file $FASTA by month..."
+	${SCRIPT_HOME}/flacotools.py split $FASTA split-by-month
+    done
+    exit 0
 fi
 
 if [[ "$CMD" == "blast" ]];
 then
   INDEX=DB
   echo "Starting BLAST jobs..."
-  nj=0
-  rm -f blast.*.done
+  rm -f blast.cmd
   for spdir in split-by-month/2*/;
   do
-      blastcmd=$spdir/blast.cmd
-      find $spdir -name \*.fa | xargs -n $MAX_BLAST echo submit -done blast.@.done -o --account=salemi,--qos=salemi-b ${SCRIPT_HOME}/blast.qsub $spdir/${INDEX} > $blastcmd
-      nfastas=$(grep -c ^ $blastcmd)
-      source $blastcmd
-      # submit -done blast.@.done ${SCRIPT_HOME}/blast.qsub $INDEX $spdir
-      nj=$((nj+nfastas))
+      find $spdir -name \*.fa | xargs -n $MAX_BLAST echo -e "$spdir\t$spdir/${INDEX}\t" >> blast.cmd
   done
-  wait_for blast $nj
+  nextflow run ${SCRIPT_HOME}/flacoblast.nf --cmd blast --blastcmd blast.cmd
+  #nextflow clean
   exit 0
 fi
 
@@ -101,7 +75,8 @@ then
   FASTA=$2
   MATCHES=$3
   OUTFILE=$4
-  ${SCRIPT_HOME}/flacotools.py extract $FASTA $MATCHES $OUTFILE
+  touch ALLMATCHES.txt
+  ${SCRIPT_HOME}/flacotools.py extract -a ALLMATCHES.txt -o $OUTFILE $FASTA $MATCHES
   exit 0
 fi
 

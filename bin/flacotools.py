@@ -6,7 +6,7 @@ import csv
 import time
 import glob
 from collections import defaultdict
-from Bio import SeqIO
+from Bio import SeqIO, Seq
 
 # Clean
 def main_clean(fastafile, words):
@@ -32,23 +32,42 @@ def main_clean(fastafile, words):
 # Split
 def parse_header(line):
     parts = line.rstrip("\r\n").split("|")
+
+    if len(parts) < 3:
+        # Bad header, can't parse!
+        return False
     if len(parts[2]) > 7:
-        return parts[1], parts[2][:7]
+        p1 = parts[1]
+        p2 = parts[2][:7]
+        if p2.count("-") == 1:
+            return p1, p2
+        else:
+            return False
     else:
-        return parts[1], parts[2]
+        p1 = parts[1]
+        p2 = parts[2]
+        if p2.count("-") == 1:
+            return p1, p2
+        else:
+            return False
 
 def main_split(fastafile, outdir):
     out = None
     for seq in SeqIO.parse(fastafile, "fasta"):
-        (seqid, month) = parse_header(seq.name)
-        destdir = outdir + "/" + month
-        outfile = destdir + "/" + seqid + ".fa"
-        try:
-            os.makedirs(destdir)
-        except:
-            pass
-        with open(outfile, "w") as out:
-            SeqIO.write(seq, out, "fasta")
+        parsed = parse_header(seq.name)
+        if parsed:
+            (seqid, month) = parsed
+            destdir = outdir + "/" + month
+            outfile = destdir + "/" + seqid + ".fa"
+            try:
+                os.makedirs(destdir)
+            except:
+                pass
+            seq.seq = Seq.Seq(str(seq.seq).replace("-", ""))
+            with open(outfile, "w") as out:
+                SeqIO.write(seq, out, "fasta")
+        else:
+            sys.stderr.write("Bad header '{}' - skipping\n".format(seq.name))
 
 def previous_month(month):
     y, m = month.split("-")
@@ -100,15 +119,17 @@ def main_splitdb(fastafile, cleanfile, outdir, excludefile, words):
             else:
                 cout.write(">" + header + "\n" + bases + "\n")
                 nout += 1
-                (seqid, month) = parse_header(header)
-                pm = previous_month(month)
-                nm = next_month(month)
-                out1 = getStream(streams, month, outdir)
-                out2 = getStream(streams, pm, outdir)
-                out3 = getStream(streams, nm, outdir)
-                out1.write(">" + header + "\n" + bases + "\n")
-                out2.write(">" + header + "\n" + bases + "\n")
-                out3.write(">" + header + "\n" + bases + "\n")
+                pheader = parse_header(header)
+                if pheader:
+                    (seqid, month) = pheader
+                    pm = previous_month(month)
+                    nm = next_month(month)
+                    out1 = getStream(streams, month, outdir)
+                    out2 = getStream(streams, pm, outdir)
+                    out3 = getStream(streams, nm, outdir)
+                    out1.write(">" + header + "\n" + bases + "\n")
+                    out2.write(">" + header + "\n" + bases + "\n")
+                    out3.write(">" + header + "\n" + bases + "\n")
 
             sys.stderr.write("\rSeq: {}, DB: {}, Excluded: {}".format(nin, nout, nexcl))
             sys.stderr.flush()
@@ -160,7 +181,10 @@ def same(h1, h2):
 
 def getBestHits(filename, out, extra=False):
     try:
-        (name, seqid, date, country) = getQuery(filename)
+        fields = getQuery(filename)
+        name = fields[0]
+        seqid = fields[1]
+        date = fields[2]
     except:
         sys.stderr.write("Cannot read header from " + filename + "\n")
         return []
@@ -241,11 +265,22 @@ def readWanted(filename):
     with open(filename, "r") as f:
         for line in f:
             wanted.append(line.split("\t")[0])
-    sys.stderr.write("{} sequences wanted.\n".format(len(wanted)))
     return wanted
 
-def main_extract(fastafile, matches, outfile):
-    wanted = readWanted(matches)
+#def readAllMatches(filename):
+#    am = []
+#    with open(filename, "r") as f:
+#        for line in f:
+
+def main_extract(fastafile, matches, outfile, allmatches=False, fixheaders=False):
+    oldmatches = readWanted(allmatches) if allmatches else []
+    allwanted = readWanted(matches)
+    wanted = []
+    for aw in allwanted:
+        if aw not in oldmatches:
+            wanted.append(aw)
+    sys.stderr.write("{} sequences wanted.\n".format(len(wanted)))
+    
     nin = n = 0
     with open(outfile, "w") as out:
         for seq in SeqIO.parse(fastafile, "fasta"):
@@ -253,12 +288,18 @@ def main_extract(fastafile, matches, outfile):
             hdr = seq.description.replace(" ", "_") # in the blast db we removed spaces from sequence names
             #name = hdr[1:].rstrip("\r\n")
             if hdr in wanted:
+                if fixheaders:
+                    hdr = hdr.replace("/", "_").replace("|", "_")
                 out.write(">" + hdr + "\n")
                 out.write(str(seq.seq).replace("-", "") + "\n")
                 n += 1
             sys.stderr.write("\r{}/{}".format(n, nin))
             sys.stderr.flush()
     sys.stderr.write("\n{} sequences extracted.\n".format(n))
+    if allmatches:
+        with open(allmatches, "a") as out:
+            for w in wanted:
+                out.write(w + "\n")
 
 # Main
 
@@ -288,4 +329,26 @@ if __name__ == "__main__":
         main_parse(args[0], args[1], args[2])
 
     elif cmd == "extract":
-        main_extract(args[0], args[1], args[2])
+        infile = None
+        matches = None
+        outfile = "/dev/stdout"
+        allmatches = None
+        fixheaders = False
+
+        prev = ""
+        for a in args:
+            if prev == "-a":
+                allmatches = a
+                prev = ""
+            elif prev == "-o":
+                outfile = a
+                prev = ""
+            elif a in ["-a", "-o"]:
+                prev = a
+            elif a == "-f":
+                fixheaders=True
+            elif infile is None:
+                infile = a
+            else:
+                matches = a
+        main_extract(infile, matches, outfile, allmatches)

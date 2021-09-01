@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
 import sys
-from Bio import SeqIO
+from Bio import SeqIO, Seq
 
 class Cleaner(object):
     infile = None
-    outfile = None
+    outfile = "/dev/stdout"
     min_length = 0
     n_frac = 1.0
+    remgaps = False
 
     def parseArgs(self, args):
         prev = ""
@@ -20,6 +21,8 @@ class Cleaner(object):
                 prev = ""
             elif a in ["-l", "-f"]:
                 prev = a
+            elif a == "-g":
+                self.remgaps = True
             elif self.infile is None:
                 self.infile = a
             else:
@@ -31,9 +34,12 @@ class Cleaner(object):
             for seq_record in SeqIO.parse(self.infile, "fasta"):
                 nin += 1
                 seq = str(seq_record.seq).upper()
+                if self.remgaps:
+                    seq = seq.replace("-", "")
+                    seq_record.seq = Seq.Seq(seq)
                 nc = seq.count("N")
                 sl = len(seq)
-                if len(seq) >= self.min_length and 1.0*nc/sl <= self.n_frac:
+                if (len(seq) >= self.min_length) and (1.0*nc/sl <= self.n_frac):
                     SeqIO.write(seq_record, out, "fasta")
                     nout += 1
         sys.stderr.write("{} sequences read, {} written ({} filtered).\n".format(nin, nout, nin-nout))
