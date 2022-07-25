@@ -4,11 +4,7 @@ flaco_blast is a pipeline to perform BLAST analysis of a set of sequences agains
 six different commands. Normally, only the *makedb* and *run* commands will be needed.
 
 ## Prerequisites
-Currently, flaco_blast is designed to run on hipergator and relies on the presence of the dibig_tools module. Therefore, before starting it please execute
-
-```
-module load dibig_tools
-```
+This program requires [Nextflow](https://nextflow.io/) and BLAST. Please ensure they are properly installed and in path.
 
 The program assumes that the input files are in FASTA format, and that sequence headers respect the GISAID format. Specifically, the header
 should contain at least three fields separated by | characters: sequence name, sequence identifier, date in the format YYYY-MM-DD. For example:
