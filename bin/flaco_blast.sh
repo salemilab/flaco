@@ -18,6 +18,12 @@ then
   shift 2
   REMOVE=$*
 
+  if [[ "$FASTA" == "" ]];
+  then
+    echo "Usage: $0 makedb msa.fasta [patterns]"
+    exit 1
+  fi
+
   mkdir -p split-by-month
   FNAME=$(basename $FASTA)
   CLEAN=${FNAME%.*}.clean.fa
@@ -32,6 +38,7 @@ then
   find split-by-month -name DB > split-by-month/DBLIST
   nextflow run ${SCRIPT_HOME}/flacoblast.nf --cmd makedb --dbfile split-by-month/DBLIST
   nextflow clean
+  echo "Database creation complete. Please use file $CLEAN in the run step."
   exit 0
 fi
 
@@ -84,6 +91,12 @@ if [[ "$CMD" == "run" ]];
 then
   R_TARGETFASTA=$2
   R_DBFASTA=$3
+
+  if [[ "$R_TARGETFASTA" == "" || "$R_DBFASTA" == "" ]];
+  then
+    echo "Usage: flaco_blast.sh run target.fa database.clean.fa"
+    exit 1
+  fi
   R_OUTFILE=${R_TARGETFASTA%.*}.out.txt
   R_MATCHES=${R_TARGETFASTA%.*}.matches.txt
   R_OUTFASTA=${R_TARGETFASTA%.*}.out.fa
